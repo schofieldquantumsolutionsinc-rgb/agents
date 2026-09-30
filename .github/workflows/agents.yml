@@ -61,7 +61,7 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
       
       - name: Save agent logs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: agent-logs
           path: logs/
