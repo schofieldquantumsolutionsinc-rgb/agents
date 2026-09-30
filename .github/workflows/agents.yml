@@ -1,0 +1,68 @@
+name: Schofield Quantum Agents
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'status'
+        type: choice
+        options:
+          - status
+          - build_apk
+          - search
+          - learn
+      query:
+        description: 'Search query or project name'
+        required: false
+        default: ''
+      project_name:
+        description: 'Project name for APK build'
+        required: false
+        default: ''
+
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  agents:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+      
+      - name: Run Agent System
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_USERNAME: schofieldquantumsolutionsinc-rgb
+          ACTION: ${{ github.event.inputs.action }}
+          QUERY: ${{ github.event.inputs.query }}
+          PROJECT_NAME: ${{ github.event.inputs.project_name }}
+        run: |
+          python agent_system.py
+      
+      - name: Upload APK if built
+        if: github.event.inputs.action == 'build_apk'
+        uses: actions/upload-artifact@v3
+        with:
+          name: apk
+          path: app/build/outputs/apk/release/app-release.apk
+      
+      - name: Save agent logs
+        uses: actions/upload-artifact@v3
+        with:
+          name: agent-logs
+          path: logs/
+          
