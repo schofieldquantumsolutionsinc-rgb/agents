@@ -45,7 +45,7 @@ jobs:
       
       - name: Run Agent System
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_USERNAME: schofieldquantumsolutionsinc-rgb
           ACTION: ${{ github.event.inputs.action }}
           QUERY: ${{ github.event.inputs.query }}
