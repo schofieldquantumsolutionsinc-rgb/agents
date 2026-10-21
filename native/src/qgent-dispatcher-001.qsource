@@ -1,0 +1,1225 @@
+# QGENT DISPATCHER 001 — rehearsal implementation of QGENT DISPATCH ABI 001
+# Native QSOURCE-1 -> QBN1 via JLSQ V17 GRACE PILER; runs on QRUNTIME/QSEED-1.
+#
+# Stream protocol (data section = 16-byte records: tag i64, value i64):
+#   STATE  records (first, in order): (0,cur_rev) (9,claim_comp)
+#          (10,claim_holder) (11,last_nonce) (12,ev_counter)
+#   REQUEST records (in order): (1,action) (2,identity) (3,authority)
+#          (4,rev_seen) (5,req_claim_comp) (6,claim_mode) (7,session) (8,nonce)
+# One request per run. Result line (stdout):
+#   RES <OK|RJ|NY|US|UK> A=<a3> ID=<i3> CAP=<d> RR=<r3> RW=<r3> EV=<e3>
+#       ERR=<e3> CC=<c3> CH=<c3> LN=<n6>
+# Status: OK executed; RJ rejected (ERR: 10 identity, 11 authority,
+#   12 stale revision, 13 claim conflict, 14 claim not held, 15 replay,
+#   16 claim mode); NY declared NOT YET IMPLEMENTED; US UNSUPPORTED;
+#   UK capability UNKNOWN (all per QGENT_ACTION_MATRIX_001).
+# Execution order per ABI: QREADER -> QAUTHORITY -> QCLAIM -> QOUTER
+#   -> QRUNTIME -> QEVIDENCE -> QREVISION_WRITE.
+    NEXT
+    SWAP
+    PUSH 0
+    EQ
+    ASSERT
+    NEXT
+    SWAP
+    PUSH 9
+    EQ
+    ASSERT
+    NEXT
+    SWAP
+    PUSH 10
+    EQ
+    ASSERT
+    NEXT
+    SWAP
+    PUSH 11
+    EQ
+    ASSERT
+    NEXT
+    SWAP
+    PUSH 12
+    EQ
+    ASSERT
+    NEXT
+    SWAP
+    PUSH 1
+    EQ
+    ASSERT
+    NEXT
+    SWAP
+    PUSH 2
+    EQ
+    ASSERT
+    NEXT
+    SWAP
+    PUSH 3
+    EQ
+    ASSERT
+    NEXT
+    SWAP
+    PUSH 4
+    EQ
+    ASSERT
+    NEXT
+    SWAP
+    PUSH 5
+    EQ
+    ASSERT
+    NEXT
+    SWAP
+    PUSH 6
+    EQ
+    ASSERT
+    NEXT
+    SWAP
+    PUSH 7
+    EQ
+    ASSERT
+    NEXT
+    SWAP
+    PUSH 8
+    EQ
+    ASSERT
+# ---------- GATE 1 (QREADER/continuity): rev_seen == cur_rev ----------
+    PICK 4
+    PICK 13
+    EQ
+    JZ RJ_STALE
+# ---------- GATE 2a (QAUTHORITY): identity in {101..106} ----------
+    PICK 6
+    DUP
+    PUSH 101
+    EQ
+    PICK 1
+    PUSH 102
+    EQ
+    ADD
+    PICK 1
+    PUSH 103
+    EQ
+    ADD
+    PICK 1
+    PUSH 104
+    EQ
+    ADD
+    PICK 1
+    PUSH 105
+    EQ
+    ADD
+    PICK 1
+    PUSH 106
+    EQ
+    ADD
+    PUSH 1
+    EQ
+    JZ RJ_ID_PRE
+    DROP
+# ---------- GATE 2b (QAUTHORITY): authority > 0 ----------
+    PICK 5
+    PUSH 0
+    GT
+    JZ RJ_AUTH
+# ---------- GATE 3 (replay): nonce > last_nonce ----------
+    PICK 0
+    PICK 10
+    GT
+    JZ RJ_REPLAY
+# ---------- GATE 4 (QCLAIM) ----------
+    PICK 7
+    PUSH 8
+    EQ
+    JZ G4_NONCLAIM
+    PICK 2
+    PUSH 1
+    EQ
+    JZ G4_TRYREL
+    JMP G4_ACQ
+G4_TRYREL:
+    PICK 2
+    PUSH 2
+    EQ
+    JZ RJ_MODE
+    PICK 11
+    PUSH 0
+    EQ
+    JZ G4_REL_B
+    JMP RJ_NOTHELD
+G4_REL_B:
+    PICK 11
+    PICK 4
+    EQ
+    JZ RJ_NOTHELD
+    PICK 10
+    PICK 7
+    EQ
+    JZ RJ_NOTHELD
+    JMP H_CLAIM_REL
+G4_ACQ:
+    PICK 11
+    PUSH 0
+    EQ
+    JZ G4_ACQ_B
+    JMP H_CLAIM_ACQ
+G4_ACQ_B:
+    PICK 11
+    PICK 4
+    EQ
+    JZ RJ_CONFLICT
+    PICK 10
+    PICK 7
+    EQ
+    JZ RJ_CONFLICT
+    JMP H_CLAIM_ACQ
+G4_NONCLAIM:
+    PICK 3
+    PUSH 0
+    EQ
+    JZ G4_NC_B
+    JMP ROUTE
+G4_NC_B:
+    PICK 11
+    PUSH 0
+    EQ
+    JZ G4_NC_C
+    JMP ROUTE
+G4_NC_C:
+    PICK 11
+    PICK 4
+    EQ
+    JZ RJ_CONFLICT
+    PICK 10
+    PICK 7
+    EQ
+    JZ RJ_CONFLICT
+    JMP ROUTE
+# ---------- ROUTING (QOUTER) ----------
+ROUTE:
+    PICK 7
+    PUSH 7
+    EQ
+    JZ RT_14
+    JMP H_READ
+RT_14:
+    PICK 7
+    PUSH 14
+    EQ
+    JZ RT_15
+    JMP H_UNK
+RT_15:
+    PICK 7
+    PUSH 15
+    EQ
+    JZ RT_NYI
+    JMP H_UNSUP
+RT_NYI:
+    PICK 7
+    DUP
+    PUSH 1
+    EQ
+    PICK 1
+    PUSH 2
+    EQ
+    ADD
+    PICK 1
+    PUSH 3
+    EQ
+    ADD
+    PICK 1
+    PUSH 4
+    EQ
+    ADD
+    PICK 1
+    PUSH 5
+    EQ
+    ADD
+    PICK 1
+    PUSH 6
+    EQ
+    ADD
+    PICK 1
+    PUSH 9
+    EQ
+    ADD
+    PICK 1
+    PUSH 10
+    EQ
+    ADD
+    PICK 1
+    PUSH 11
+    EQ
+    ADD
+    PICK 1
+    PUSH 12
+    EQ
+    ADD
+    PICK 1
+    PUSH 13
+    EQ
+    ADD
+    PUSH 1
+    EQ
+    JZ RT_UNSUP2
+    DROP
+    JMP H_NYI
+RT_UNSUP2:
+    DROP
+    JMP H_UNSUP
+# ---------- HANDLERS (build result block: status cap err rw cc ch ln ev)
+H_READ:
+    PUSH 0
+    PUSH 0
+    PUSH 0
+    PICK 15
+    PICK 15
+    PICK 15
+    PICK 6
+    PICK 15
+    PUSH 1
+    ADD
+    JMP EMIT
+H_CLAIM_ACQ:
+    PUSH 0
+    PUSH 0
+    PUSH 0
+    PICK 15
+    PUSH 1
+    ADD
+    PICK 7
+    PICK 11
+    PICK 6
+    PICK 15
+    PUSH 1
+    ADD
+    JMP EMIT
+H_CLAIM_REL:
+    PUSH 0
+    PUSH 0
+    PUSH 0
+    PICK 15
+    PUSH 1
+    ADD
+    PUSH 0
+    PUSH 0
+    PICK 6
+    PICK 15
+    PUSH 1
+    ADD
+    JMP EMIT
+H_NYI:
+    PUSH 2
+    PUSH 1
+    PUSH 0
+    PICK 15
+    PICK 15
+    PICK 15
+    PICK 6
+    PUSH 0
+    JMP EMIT
+H_UNSUP:
+    PUSH 1
+    PUSH 2
+    PUSH 0
+    PICK 15
+    PICK 15
+    PICK 15
+    PICK 6
+    PUSH 0
+    JMP EMIT
+H_UNK:
+    PUSH 3
+    PUSH 3
+    PUSH 0
+    PICK 15
+    PICK 15
+    PICK 15
+    PICK 6
+    PUSH 0
+    JMP EMIT
+# ---------- REJECTS ----------
+RJ_STALE:
+    PUSH 9
+    PUSH 4
+    PUSH 12
+    PICK 15
+    PICK 15
+    PICK 15
+    PICK 15
+    PUSH 0
+    JMP EMIT
+RJ_ID_PRE:
+    DROP
+    PUSH 9
+    PUSH 4
+    PUSH 10
+    PICK 15
+    PICK 15
+    PICK 15
+    PICK 15
+    PUSH 0
+    JMP EMIT
+RJ_AUTH:
+    PUSH 9
+    PUSH 4
+    PUSH 11
+    PICK 15
+    PICK 15
+    PICK 15
+    PICK 15
+    PUSH 0
+    JMP EMIT
+RJ_REPLAY:
+    PUSH 9
+    PUSH 4
+    PUSH 15
+    PICK 15
+    PICK 15
+    PICK 15
+    PICK 15
+    PUSH 0
+    JMP EMIT
+RJ_MODE:
+    PUSH 9
+    PUSH 4
+    PUSH 16
+    PICK 15
+    PICK 15
+    PICK 15
+    PICK 15
+    PUSH 0
+    JMP EMIT
+RJ_NOTHELD:
+    PUSH 9
+    PUSH 4
+    PUSH 14
+    PICK 15
+    PICK 15
+    PICK 15
+    PICK 15
+    PUSH 0
+    JMP EMIT
+RJ_CONFLICT:
+    PUSH 9
+    PUSH 4
+    PUSH 13
+    PICK 15
+    PICK 15
+    PICK 15
+    PICK 15
+    PUSH 0
+    JMP EMIT
+EMIT:
+    PUSH 82
+    EMIT
+    PUSH 69
+    EMIT
+    PUSH 83
+    EMIT
+    PUSH 32
+    EMIT
+    PICK 7
+    PUSH 0
+    EQ
+    JZ TOK_1
+    PUSH 79
+    EMIT
+    PUSH 75
+    EMIT
+    JMP TOK_DONE
+TOK_1:
+    PICK 7
+    PUSH 1
+    EQ
+    JZ TOK_2
+    PUSH 85
+    EMIT
+    PUSH 83
+    EMIT
+    JMP TOK_DONE
+TOK_2:
+    PICK 7
+    PUSH 2
+    EQ
+    JZ TOK_3
+    PUSH 78
+    EMIT
+    PUSH 89
+    EMIT
+    JMP TOK_DONE
+TOK_3:
+    PICK 7
+    PUSH 3
+    EQ
+    JZ TOK_9
+    PUSH 85
+    EMIT
+    PUSH 75
+    EMIT
+    JMP TOK_DONE
+TOK_9:
+    PUSH 82
+    EMIT
+    PUSH 74
+    EMIT
+TOK_DONE:
+    PUSH 32
+    EMIT
+    PUSH 65
+    EMIT
+    PUSH 61
+    EMIT
+    PICK 15
+    PUSH 0
+    SWAP
+PA_L100:
+    PICK 0
+    PUSH 100
+    PUSH 1
+    SUB
+    GT
+    JZ PA_D100
+    PUSH 100
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PA_L100
+PA_D100:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PA_L10:
+    PICK 0
+    PUSH 10
+    PUSH 1
+    SUB
+    GT
+    JZ PA_D10
+    PUSH 10
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PA_L10
+PA_D10:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PA_L1:
+    PICK 0
+    PUSH 1
+    PUSH 1
+    SUB
+    GT
+    JZ PA_D1
+    PUSH 1
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PA_L1
+PA_D1:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    DROP
+    PUSH 32
+    EMIT
+    PUSH 73
+    EMIT
+    PUSH 68
+    EMIT
+    PUSH 61
+    EMIT
+    PICK 14
+    PUSH 0
+    SWAP
+PI_L100:
+    PICK 0
+    PUSH 100
+    PUSH 1
+    SUB
+    GT
+    JZ PI_D100
+    PUSH 100
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PI_L100
+PI_D100:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PI_L10:
+    PICK 0
+    PUSH 10
+    PUSH 1
+    SUB
+    GT
+    JZ PI_D10
+    PUSH 10
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PI_L10
+PI_D10:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PI_L1:
+    PICK 0
+    PUSH 1
+    PUSH 1
+    SUB
+    GT
+    JZ PI_D1
+    PUSH 1
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PI_L1
+PI_D1:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    DROP
+    PUSH 32
+    EMIT
+    PUSH 67
+    EMIT
+    PUSH 65
+    EMIT
+    PUSH 80
+    EMIT
+    PUSH 61
+    EMIT
+    PICK 6
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 32
+    EMIT
+    PUSH 82
+    EMIT
+    PUSH 82
+    EMIT
+    PUSH 61
+    EMIT
+    PICK 20
+    PUSH 0
+    SWAP
+PR_L100:
+    PICK 0
+    PUSH 100
+    PUSH 1
+    SUB
+    GT
+    JZ PR_D100
+    PUSH 100
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PR_L100
+PR_D100:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PR_L10:
+    PICK 0
+    PUSH 10
+    PUSH 1
+    SUB
+    GT
+    JZ PR_D10
+    PUSH 10
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PR_L10
+PR_D10:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PR_L1:
+    PICK 0
+    PUSH 1
+    PUSH 1
+    SUB
+    GT
+    JZ PR_D1
+    PUSH 1
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PR_L1
+PR_D1:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    DROP
+    PUSH 32
+    EMIT
+    PUSH 82
+    EMIT
+    PUSH 87
+    EMIT
+    PUSH 61
+    EMIT
+    PICK 4
+    PUSH 0
+    SWAP
+PW_L100:
+    PICK 0
+    PUSH 100
+    PUSH 1
+    SUB
+    GT
+    JZ PW_D100
+    PUSH 100
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PW_L100
+PW_D100:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PW_L10:
+    PICK 0
+    PUSH 10
+    PUSH 1
+    SUB
+    GT
+    JZ PW_D10
+    PUSH 10
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PW_L10
+PW_D10:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PW_L1:
+    PICK 0
+    PUSH 1
+    PUSH 1
+    SUB
+    GT
+    JZ PW_D1
+    PUSH 1
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PW_L1
+PW_D1:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    DROP
+    PUSH 32
+    EMIT
+    PUSH 69
+    EMIT
+    PUSH 86
+    EMIT
+    PUSH 61
+    EMIT
+    PICK 0
+    PUSH 0
+    SWAP
+PE_L100:
+    PICK 0
+    PUSH 100
+    PUSH 1
+    SUB
+    GT
+    JZ PE_D100
+    PUSH 100
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PE_L100
+PE_D100:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PE_L10:
+    PICK 0
+    PUSH 10
+    PUSH 1
+    SUB
+    GT
+    JZ PE_D10
+    PUSH 10
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PE_L10
+PE_D10:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PE_L1:
+    PICK 0
+    PUSH 1
+    PUSH 1
+    SUB
+    GT
+    JZ PE_D1
+    PUSH 1
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PE_L1
+PE_D1:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    DROP
+    PUSH 32
+    EMIT
+    PUSH 69
+    EMIT
+    PUSH 82
+    EMIT
+    PUSH 82
+    EMIT
+    PUSH 61
+    EMIT
+    PICK 5
+    PUSH 0
+    SWAP
+PX_L100:
+    PICK 0
+    PUSH 100
+    PUSH 1
+    SUB
+    GT
+    JZ PX_D100
+    PUSH 100
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PX_L100
+PX_D100:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PX_L10:
+    PICK 0
+    PUSH 10
+    PUSH 1
+    SUB
+    GT
+    JZ PX_D10
+    PUSH 10
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PX_L10
+PX_D10:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PX_L1:
+    PICK 0
+    PUSH 1
+    PUSH 1
+    SUB
+    GT
+    JZ PX_D1
+    PUSH 1
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PX_L1
+PX_D1:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    DROP
+    PUSH 32
+    EMIT
+    PUSH 67
+    EMIT
+    PUSH 67
+    EMIT
+    PUSH 61
+    EMIT
+    PICK 3
+    PUSH 0
+    SWAP
+PC_L100:
+    PICK 0
+    PUSH 100
+    PUSH 1
+    SUB
+    GT
+    JZ PC_D100
+    PUSH 100
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PC_L100
+PC_D100:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PC_L10:
+    PICK 0
+    PUSH 10
+    PUSH 1
+    SUB
+    GT
+    JZ PC_D10
+    PUSH 10
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PC_L10
+PC_D10:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PC_L1:
+    PICK 0
+    PUSH 1
+    PUSH 1
+    SUB
+    GT
+    JZ PC_D1
+    PUSH 1
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PC_L1
+PC_D1:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    DROP
+    PUSH 32
+    EMIT
+    PUSH 67
+    EMIT
+    PUSH 72
+    EMIT
+    PUSH 61
+    EMIT
+    PICK 2
+    PUSH 0
+    SWAP
+PH_L100:
+    PICK 0
+    PUSH 100
+    PUSH 1
+    SUB
+    GT
+    JZ PH_D100
+    PUSH 100
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PH_L100
+PH_D100:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PH_L10:
+    PICK 0
+    PUSH 10
+    PUSH 1
+    SUB
+    GT
+    JZ PH_D10
+    PUSH 10
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PH_L10
+PH_D10:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PH_L1:
+    PICK 0
+    PUSH 1
+    PUSH 1
+    SUB
+    GT
+    JZ PH_D1
+    PUSH 1
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PH_L1
+PH_D1:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    DROP
+    PUSH 32
+    EMIT
+    PUSH 76
+    EMIT
+    PUSH 78
+    EMIT
+    PUSH 61
+    EMIT
+    PICK 1
+    PUSH 0
+    SWAP
+PN_L100000:
+    PICK 0
+    PUSH 100000
+    PUSH 1
+    SUB
+    GT
+    JZ PN_D100000
+    PUSH 100000
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PN_L100000
+PN_D100000:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PN_L10000:
+    PICK 0
+    PUSH 10000
+    PUSH 1
+    SUB
+    GT
+    JZ PN_D10000
+    PUSH 10000
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PN_L10000
+PN_D10000:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PN_L1000:
+    PICK 0
+    PUSH 1000
+    PUSH 1
+    SUB
+    GT
+    JZ PN_D1000
+    PUSH 1000
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PN_L1000
+PN_D1000:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PN_L100:
+    PICK 0
+    PUSH 100
+    PUSH 1
+    SUB
+    GT
+    JZ PN_D100
+    PUSH 100
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PN_L100
+PN_D100:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PN_L10:
+    PICK 0
+    PUSH 10
+    PUSH 1
+    SUB
+    GT
+    JZ PN_D10
+    PUSH 10
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PN_L10
+PN_D10:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    PUSH 0
+    SWAP
+PN_L1:
+    PICK 0
+    PUSH 1
+    PUSH 1
+    SUB
+    GT
+    JZ PN_D1
+    PUSH 1
+    SUB
+    SWAP
+    PUSH 1
+    ADD
+    SWAP
+    JMP PN_L1
+PN_D1:
+    SWAP
+    PUSH 48
+    ADD
+    EMIT
+    DROP
+    PUSH 10
+    EMIT
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DROP
+    DATALEFT
+    PUSH 0
+    EQ
+    ASSERT
+    HALT
